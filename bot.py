@@ -2908,11 +2908,17 @@ async def _process_entry_impl(application, entry, forced_transfer_url=None):
             transfer_url,
         )
     except Exception as e:
-        logger.exception(
-            "❌ Impossible de résoudre Transfer.it pour %s : %s",
-            title,
-            e,
-        )
+        if "blocked" in str(e).lower():
+            logger.warning(
+                "🚫 Transfer.it bloqué (abuse report), épisode ignoré : %s",
+                title,
+            )
+        else:
+            logger.exception(
+                "❌ Impossible de résoudre Transfer.it pour %s : %s",
+                title,
+                e,
+            )
         return
 
     # --------------------------------------------------------
