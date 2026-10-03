@@ -2,4 +2,4 @@ python-telegram-bot>=21.0
 feedparser>=6.0
 httpx>=0.27
 aria2p>=0.12
-transferit==0.1.0
+transferit-py>=0.1.0rc1
