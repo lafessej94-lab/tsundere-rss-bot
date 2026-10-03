@@ -24,6 +24,9 @@ from telegram.ext import (
 # Intervalle entre deux vérifications RSS
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "60"))
 
+# Nombre d'épisodes récents retraités au démarrage (0 = aucun)
+STARTUP_COUNT = int(os.getenv("STARTUP_COUNT", "5"))
+
 # ============================================================
 # CONFIGURATION
 # ============================================================
@@ -2915,6 +2918,12 @@ async def _process_entry_impl(application, entry, forced_transfer_url=None):
                 title,
                 e,
             )
+            # Mémorise le lien mort : il ne sera plus retenté
+            # à chaque redémarrage du bot.
+            try:
+                mark_processed(guid, title, transfer_url)
+            except Exception:
+                logger.exception("⚠️ Impossible de mémoriser le lien mort")
         else:
             logger.exception(
                 "❌ Impossible de résoudre Transfer.it pour %s : %s",
@@ -3189,8 +3198,10 @@ async def rss_loop(application):
                     startup_episode_keys.add(episode_id)
                     startup_entries.append(entry)
 
-                    if len(startup_entries) >= 5:
+                    if len(startup_entries) >= max(STARTUP_COUNT, 1):
                         break
+
+                startup_entries = startup_entries[:max(STARTUP_COUNT, 0)]
 
                 logger.info(
                     "🎞️ %d vidéo(s) HARDSUB + Transfer.it trouvée(s)",
