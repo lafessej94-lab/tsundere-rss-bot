@@ -4022,6 +4022,76 @@ async def permanent_link_start(update: Update, context: ContextTypes.DEFAULT_TYP
 # MAIN
 # ============================================================
 
+async def rssdebug_command(update, context):
+    """
+    /rssdebug : affiche, pour les 3 premières entrées HARDSUB du flux,
+    tous les liens trouvés champ par champ et celui que le bot choisit.
+    Réservé au créateur.
+    """
+    if not update.effective_user or update.effective_user.id != CREATOR_ID:
+        return
+
+    if not update.message:
+        return
+
+    try:
+        feed = await fetch_feed()
+    except Exception as e:
+        await update.message.reply_text(f"❌ Lecture RSS impossible : {e}")
+        return
+
+    entries = getattr(feed, "entries", []) or []
+    shown = 0
+
+    for entry in entries:
+        if not is_hardsub_entry(entry):
+            continue
+
+        lines = [f"TITRE : {entry.get('title', '?')}"]
+
+        for key in ("published", "id", "guid", "link"):
+            if entry.get(key):
+                lines.append(f"{key} : {entry.get(key)}")
+
+        for key in entry.keys():
+            if "tsundere" in str(key).lower():
+                lines.append(f"{key} : {entry.get(key)}")
+
+        for enc in entry.get("enclosures", []) or []:
+            lines.append(
+                f"enclosure : {enc.get('href') or enc.get('url')}"
+            )
+
+        for media in entry.get("media_content", []) or []:
+            lines.append(
+                f"media : {media.get('url') or media.get('href')}"
+            )
+
+        for field in ("description", "summary"):
+            for url in extract_urls(str(entry.get(field) or "")):
+                lines.append(f"{field} : {url}")
+
+        for content in entry.get("content", []) or []:
+            for url in extract_urls(str(content.get("value") or "")):
+                lines.append(f"content : {url}")
+
+        lines.append(f"==> CHOISI : {extract_video_url(entry)}")
+
+        await update.message.reply_text(
+            "\n".join(lines)[:3800],
+            disable_web_page_preview=True,
+        )
+
+        shown += 1
+        if shown >= 3:
+            break
+
+    if shown == 0:
+        await update.message.reply_text(
+            "Aucune entrée HARDSUB trouvée dans le flux."
+        )
+
+
 async def testlink_command(update, context):
     """
     /testlink <lien transfer.it> [titre]
@@ -4354,6 +4424,14 @@ def main():
         CommandHandler(
             "testlink",
             testlink_command,
+        ),
+        group=-1,
+    )
+
+    application.add_handler(
+        CommandHandler(
+            "rssdebug",
+            rssdebug_command,
         ),
         group=-1,
     )
