@@ -2910,8 +2910,10 @@ async def _process_entry_impl(application, entry, forced_transfer_url=None):
     except Exception as e:
         if "blocked" in str(e).lower():
             logger.warning(
-                "🚫 Transfer.it bloqué (abuse report), épisode ignoré : %s",
+                "🚫 Transfer.it répond « blocked » (lien bloqué OU IP Colab "
+                "bloquée par Mega), épisode ignoré : %s | détail : %s",
                 title,
+                e,
             )
         else:
             logger.exception(
@@ -4020,6 +4022,60 @@ async def permanent_link_start(update: Update, context: ContextTypes.DEFAULT_TYP
 # MAIN
 # ============================================================
 
+async def testlink_command(update, context):
+    """
+    /testlink <lien transfer.it> [titre]
+    Crée et publie un lien permanent dans le canal pour UN lien
+    Transfer.it donné, sans passer par le flux RSS. Réservé au créateur.
+    """
+    if not update.effective_user or update.effective_user.id != CREATOR_ID:
+        return
+
+    if not update.message:
+        return
+
+    args = context.args or []
+
+    if not args or "transfer.it/t/" not in args[0].lower():
+        await update.message.reply_text(
+            "Usage : /testlink <lien transfer.it> [titre]\n\n"
+            "Exemple :\n"
+            "/testlink https://transfer.it/t/xxxxxxxx Mon Anime S01E01"
+        )
+        return
+
+    transfer_url = args[0].strip()
+    title = " ".join(args[1:]).strip() or "Test Lien S01E01"
+
+    entry = {
+        "title": title,
+        "guid": f"testlink-{int(time.time())}",
+        "tsundere_hardsub": "true",
+    }
+
+    await update.message.reply_text(
+        f"🧪 Test du lien : {title}\n⏳ Création du lien permanent..."
+    )
+
+    try:
+        await process_entry(
+            context.application,
+            entry,
+            forced_transfer_url=transfer_url,
+            bypass_duplicate=True,
+        )
+    except Exception as e:
+        logger.exception("❌ Échec /testlink : %s", e)
+        await update.message.reply_text(f"❌ Échec : {e}")
+        return
+
+    await update.message.reply_text(
+        "✅ Terminé. Vérifie le canal : le message avec le lien "
+        "permanent doit y apparaître. Sinon, regarde les logs Colab "
+        "(ligne « 📨 Lien PERMANENT envoyé » ou erreur)."
+    )
+
+
 async def test_upload_command(update, context):
     if not update.effective_user or update.effective_user.id != CREATOR_ID:
         return
@@ -4290,6 +4346,14 @@ def main():
         CommandHandler(
             "test",
             test_upload_command,
+        ),
+        group=-1,
+    )
+
+    application.add_handler(
+        CommandHandler(
+            "testlink",
+            testlink_command,
         ),
         group=-1,
     )
